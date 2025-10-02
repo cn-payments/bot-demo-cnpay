@@ -1,5 +1,5 @@
 {
-  "bot_token": "8488620903:AAGERLQY9jViuCyE4JpNQmUB1A84rqKMnGM",
+  "bot_token": "8488620903:AAFhKL4x28PGFQLKhXXnZIqT56RecLEWAGo",
   "admin_id": 7258291634,
   "admin_user": "cnpaygateway",
   "pix_demo_qrcode": "00020101021226810014br.gov.bcb.pix2559qr.woovi.com/qr/v2/cob/2365b640-748a-4ba0-8e81-b3bb70abe4bd520400005303986540549.905802BR5911CN_PAY_LTDA6009Sao_Paulo6229052595bf9c63034f4a75b7985d62663046AE6",
@@ -109,10 +109,10 @@
     }
   ],
   "database": {
-    "host": "shinkansen.proxy.rlwy.net",
-    "port": 16041,
+    "host": "caboose.proxy.rlwy.net",
+    "port": 25648,
     "user": "root",
-    "password": "vGDfmxGZxCRcaHomscEEYENUiFxuitkM",
+    "password": "DRKEfSxgEvsDDXspWpVwDkYFQCEDGiWD",
     "database": "bot_demo"
   },
   "welcome_file": {
