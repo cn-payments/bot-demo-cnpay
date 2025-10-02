@@ -1,0 +1,124 @@
+{
+  "bot_token": "7921956520:AAFV9_48z4rJOohWnKwf5Lu5FosBvuOQ1X0",
+  "admin_id": 7258291634,
+  "admin_user": "cnpaygateway",
+  "pix_demo_qrcode": "00020101021226810014br.gov.bcb.pix2559qr.woovi.com/qr/v2/cob/2365b640-748a-4ba0-8e81-b3bb70abe4bd520400005303986540549.905802BR5911CN_PAY_LTDA6009Sao_Paulo6229052595bf9c63034f4a75b7985d62663046AE6",
+  "messages": {
+    "welcome": "🚀 Bem-vindo ao futuro das vendas no Telegram!\n\n💎 Você está prestes a descobrir como transformar conversas em VENDAS AUTOMÁTICAS!\n\n✨ Esta é uma demonstração real do poder do CN BOT - imagine isso funcionando 24/7 para você!",
+    "payment_instructions": "💰 MOMENTO DA VERDADE!\n\n🎯 Clique no botão abaixo e veja como seus clientes terão uma experiência de pagamento PERFEITA!\n\n⚡ Em segundos você entenderá por que este sistema converte tanto!",
+    "payment_success": "🎉 PARABÉNS! Pagamento aprovado com sucesso!\n\n👑 Você agora é VIP (DEMONSTRAÇÃO) e pode ver exatamente como seus clientes se sentirão!\n\n🔥 Imagine essa sensação multiplicada por centenas de vendas automáticas!",
+    "payment_error": "⚠️ Ops! Erro na simulação do pagamento.\n\n🔄 Não se preocupe, isso é só demonstração! No sistema real, temos 99.9% de aprovação.\n\n💪 Tente novamente para ver a mágica acontecer!",
+    "broadcast_prefix": "🎯 [DEMO BROADCAST]"
+  },
+  "webhook": {
+    "enabled": true,
+    "url": "https://primary-production-f078d.up.railway.app/webhook/leads-bot-telegram-cnpayy_bot",
+    "events": {
+      "user_start": true,
+      "payment_approved": false,
+      "payment_rejected": false,
+      "subscription_expired": false,
+      "admin_broadcast": false,
+      "user_vip_access": false
+    },
+    "headers": {
+      "Authorization": "Bearer seu-token-aqui",
+      "Content-Type": "application/json"
+    },
+    "timeout": 10
+  },
+  "lead_capture": {
+    "enabled": true,
+    "require_email": true,
+    "require_phone": true,
+    "skip_existing_users": true,
+    "messages": {
+      "welcome": "👋 Olá! Bem-vindo ao BOT DEMO da CN PAY!\n\n🔍 Este é apenas um teste para você conhecer o sistema.\n\n⚠️ IMPORTANTE: No seu bot integrado, essas informações NÃO serão solicitadas aos seus leads!\n\nPara continuar a demonstração, preciso de algumas informações:",
+      "email_request": "📧 Por favor, envie um e-mail para teste:\n\n💡 Lembre-se: isso é só para demonstração! No bot real, seus leads vão direto para os planos.",
+      "phone_request": "📱 Agora envie um telefone para teste (com DDD):\n\n✨ No seu bot personalizado, essa etapa será removida e seus leads terão acesso imediato aos produtos!",
+      "invalid_email": "❌ E-mail inválido para o teste. Tente novamente:\n\n(Use qualquer formato válido, é só demonstração)",
+      "invalid_phone": "❌ Telefone inválido para demonstração. Use formato: (11) 99999-9999\n\n(Qualquer número válido serve para o teste)",
+      "success": "✅ Dados de teste salvos com sucesso!\n\n🚀 Agora vamos aos planos VIP - esta parte SIM estará no seu bot real!\n\n💎 Veja como seus leads verão as ofertas:"
+    }
+  },
+  "messages": {
+    "welcome": "🎯 Demonstração CN BOT em ação!\n\n💰 Veja como seus clientes terão uma experiência PREMIUM de compra!\n\n🚀 Este é o mesmo sistema que já processou milhares de vendas automáticas!",
+    "payment_instructions": "💎 Experiência de pagamento profissional!\n\n🔥 Clique no botão abaixo e sinta como seus clientes se sentirão ao comprar!\n\n⚡ Processo otimizado para máxima conversão!",
+    "payment_success": "🏆 SUCESSO! Pagamento aprovado instantaneamente!\n\n✅ Você agora é VIP (DEMO) - exatamente como seus clientes ficarão!\n\n💸 Imagine essa alegria se repetindo centenas de vezes no seu negócio!",
+    "payment_error": "🛠️ Simulação interrompida (normal no demo)!\n\n✅ No sistema real, nossa taxa de aprovação é superior a 95%!\n\n🎯 Tente novamente para completar a experiência!",
+    "broadcast_prefix": "📢 [DEMO EXCLUSIVO]",
+    "pix_automatico_instructions": "⚡ PIX TURBINADO ativado!\n\n💰 Pagamento instantâneo = Cliente satisfeito!\n\n🚀 Seus compradores vão AMAR a rapidez!"
+  },
+  "payment_methods": {
+    "pix_demo": {
+      "enabled": true,
+      "description": "💸 PIX INSTANTÂNEO - A forma mais rápida e segura de garantir seu acesso VIP! (Demonstração do sistema real)"
+    }
+  },
+  "broadcast": {
+    "enabled": true,
+    "default_target": "all",
+    "allow_video": true,
+    "allow_buttons": true
+  },
+  "vip_groups": [
+    {
+      "id": 1,
+      "name": "VIP GERAL - Comunidade Exclusiva",
+      "group_id": -1002449868739,
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "name": "VIP PREMIUM - Elite dos Vendedores",
+      "group_id": -1002449868739,
+      "is_active": true
+    }
+  ],
+  "plans": [
+    {
+      "id": 1,
+      "name": "VIP MENSAL",
+      "price": 29.9,
+      "duration_days": 30,
+      "description": "Acesso completo por 30 dias!\n\n✅ Ideal para testar o poder do sistema\n✅ Suporte prioritário incluído\n✅ Todas as funcionalidades liberadas\n\n🔥 MAIS ESCOLHIDO pelos iniciantes!\n\n💡 PERSONALIZE: Você pode configurar quantos dias quiser (7, 15, 30, etc.) ou até mesmo acesso permanente!"
+    },
+    {
+      "id": 2,
+      "name": "VIP TRIMESTRAL",
+      "price": 79.9,
+      "duration_days": 90,
+      "description": "🏆 3 MESES de acesso total!\n\n💰 ECONOMIA de R$ 10,00 vs mensal\n✅ Tempo ideal para dominar o sistema\n✅ Suporte VIP prioritário\n✅ Atualizações gratuitas inclusas\n\n🎯 MELHOR CUSTO-BENEFÍCIO!\n\n💡 PERSONALIZE: Configure o período que desejar (60, 90, 120 dias) ou crie planos únicos para seu negócio!"
+    },
+    {
+      "id": 3,
+      "name": "VIP PERMANENTE",
+      "price": 199.9,
+      "duration_days": -1,
+      "description": "ACESSO VITALÍCIO - Pague 1x, use para SEMPRE!\n\n🔥 ECONOMIA de mais de R$ 160/ano\n✅ Todas as atualizações GRATUITAS\n✅ Suporte PREMIUM vitalício\n✅ Acesso a funcionalidades EXCLUSIVAS\n✅ Comunidade VIP PERMANENTE\n\n🏆 ESCOLHA DOS PROFISSIONAIS!\n\n💡 PERSONALIZE: Você decide! Pode ser permanente, anual, ou qualquer período. O sistema se adapta 100% ao seu modelo de negócio!"
+    }
+  ],
+  "subscriptions": [
+    {
+      "user_id": 7258291634,
+      "plan_id": 1,
+      "plan_name": "VIP Mensal",
+      "start_date": "2025-06-25 15:37:23",
+      "end_date": "2025-07-25 15:37:23",
+      "is_permanent": false
+    }
+  ],
+  "database": {
+    "host": "caboose.proxy.rlwy.net",
+    "port": 25648,
+    "user": "root",
+    "password": "DRKEfSxgEvsDDXspWpVwDkYFQCEDGiWD",
+    "database": "bot_demo"
+  },
+  "welcome_file": {
+    "file_id": "BAACAgEAAxkBAAIEV2hcU-RRv6FdMMXNOeXjHhqafzmuAAJEBQACJp_hRkUDL8HCCCe7NgQ",
+    "file_type": "video",
+    "caption": "🎬 Vídeo de apresentação do CN BOT!\n\n🚀 Descubra como transformar seu Telegram em uma máquina de vendas!\n\n💰 Assista e veja o potencial de faturamento que você tem em mãos!"
+  }
+}
+
