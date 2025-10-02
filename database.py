@@ -22,7 +22,11 @@ class Database:
                 port=self.db_cfg.get('port', 3306),
                 user=self.db_cfg.get('user', 'root'),
                 password=self.db_cfg.get('password', ''),
-                database=self.db_cfg.get('database', 'bot_demo')
+                database=self.db_cfg.get('database', 'bot_demo'),
+                connection_timeout=10,
+                ssl_disabled=False,
+                ssl_verify_cert=True,
+                ssl_verify_identity=True
             )
             return self.connection
         except Error as e:
