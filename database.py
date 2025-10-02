@@ -26,7 +26,8 @@ class Database:
                 connection_timeout=10,
                 ssl_disabled=False,
                 ssl_verify_cert=True,
-                ssl_verify_identity=True
+                ssl_verify_identity=True,
+                ssl_ca='/etc/ssl/certs/ca-certificates.crt'
             )
             return self.connection
         except Error as e:

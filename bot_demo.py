@@ -2368,6 +2368,13 @@ def main():
     if not token:
         return
     application = Application.builder().token(token).build()
+    
+    async def on_error(update, context):
+        try:
+            logger.exception("Unhandled error during update processing", exc_info=context.error)
+        except Exception:
+            pass
+    application.add_error_handler(on_error)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("vip", vip))
     application.add_handler(CommandHandler("admin", admin))
@@ -2433,7 +2440,12 @@ class DatabaseDemo:
             port=self.port,
             user=self.user,
             password=self.password,
-            database=self.database
+            database=self.database,
+            connection_timeout=10,
+            ssl_disabled=False,
+            ssl_verify_cert=True,
+            ssl_verify_identity=True,
+            ssl_ca='/etc/ssl/certs/ca-certificates.crt'
         )
         return self.connection
 
