@@ -1,5 +1,5 @@
 {
-  "bot_token": "8488620903:AAFhKL4x28PGFQLKhXXnZIqT56RecLEWAGo",
+  "bot_token": "7921956520:AAFV9_48z4rJOohWnKwf5Lu5FosBvuOQ1X0",
   "admin_id": 7258291634,
   "admin_user": "cnpaygateway",
   "pix_demo_qrcode": "00020101021226810014br.gov.bcb.pix2559qr.woovi.com/qr/v2/cob/2365b640-748a-4ba0-8e81-b3bb70abe4bd520400005303986540549.905802BR5911CN_PAY_LTDA6009Sao_Paulo6229052595bf9c63034f4a75b7985d62663046AE6",
@@ -109,11 +109,11 @@
     }
   ],
   "database": {
-    "host": "caboose.proxy.rlwy.net",
-    "port": 25648,
+    "host": "shinkansen.proxy.rlwy.net",
+    "port": 16041,
     "user": "root",
-    "password": "DRKEfSxgEvsDDXspWpVwDkYFQCEDGiWD",
-    "database": "bot_demo"
+    "password": "vGDfmxGZxCRcaHomscEEYENUiFxuitkM",
+    "database": "railway"
   },
   "welcome_file": {
     "file_id": "BAACAgEAAxkBAAIEV2hcU-RRv6FdMMXNOeXjHhqafzmuAAJEBQACJp_hRkUDL8HCCCe7NgQ",
