@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import asyncio
+import tempfile
+import shutil
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, InputMediaPhoto
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
@@ -121,10 +123,79 @@ def get_active_subscriptions_demo(user_id):
                     continue
     return result
 
+async def cleanup_previous_messages(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """Limpa mensagens anteriores do bot para o usuário"""
+    try:
+        # Armazenar mensagens anteriores do bot para este usuário
+        if 'bot_messages' not in context.bot_data:
+            context.bot_data['bot_messages'] = {}
+        
+        user_messages = context.bot_data['bot_messages'].get(user_id, [])
+        
+        # Deletar mensagens anteriores (máximo 10 para evitar spam)
+        for message_id in user_messages[-10:]:  # Pegar as últimas 10 mensagens
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.effective_chat.id,
+                    message_id=message_id
+                )
+            except Exception as e:
+                # Ignorar erros de mensagens já deletadas ou inacessíveis
+                logger.debug(f"Erro ao deletar mensagem {message_id}: {e}")
+                continue
+        
+        # Limpar a lista de mensagens do usuário
+        context.bot_data['bot_messages'][user_id] = []
+        
+    except Exception as e:
+        logger.error(f"Erro ao limpar mensagens anteriores: {e}")
+
+async def track_bot_message(context: ContextTypes.DEFAULT_TYPE, user_id: int, message_id: int):
+    """Rastreia mensagens do bot para limpeza posterior"""
+    try:
+        if 'bot_messages' not in context.bot_data:
+            context.bot_data['bot_messages'] = {}
+        
+        if user_id not in context.bot_data['bot_messages']:
+            context.bot_data['bot_messages'][user_id] = []
+        
+        # Adicionar nova mensagem à lista
+        context.bot_data['bot_messages'][user_id].append(message_id)
+        
+        # Manter apenas as últimas 20 mensagens por usuário
+        if len(context.bot_data['bot_messages'][user_id]) > 20:
+            context.bot_data['bot_messages'][user_id] = context.bot_data['bot_messages'][user_id][-20:]
+            
+    except Exception as e:
+        logger.error(f"Erro ao rastrear mensagem do bot: {e}")
+
+async def track_bot_message_edit(context: ContextTypes.DEFAULT_TYPE, user_id: int, message_id: int):
+    """Rastreia edições de mensagens do bot para limpeza posterior"""
+    try:
+        if 'bot_messages' not in context.bot_data:
+            context.bot_data['bot_messages'] = {}
+        
+        if user_id not in context.bot_data['bot_messages']:
+            context.bot_data['bot_messages'][user_id] = []
+        
+        # Adicionar mensagem editada à lista (se não estiver já)
+        if message_id not in context.bot_data['bot_messages'][user_id]:
+            context.bot_data['bot_messages'][user_id].append(message_id)
+        
+        # Manter apenas as últimas 20 mensagens por usuário
+        if len(context.bot_data['bot_messages'][user_id]) > 20:
+            context.bot_data['bot_messages'][user_id] = context.bot_data['bot_messages'][user_id][-20:]
+            
+    except Exception as e:
+        logger.error(f"Erro ao rastrear edição de mensagem do bot: {e}")
+
 # Comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config = load_config()
     user_id = update.effective_user.id
+    
+    # Limpar mensagens anteriores do bot para este usuário
+    await cleanup_previous_messages(update, context, user_id)
     
     # Verificar se o usuário já tem dados completos (versão otimizada)
     has_email, has_phone = check_user_has_contact_data_optimized(user_id)
@@ -161,6 +232,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         db.close()
     
+    # Limpar mensagens anteriores antes do fluxo normal
+    await cleanup_previous_messages(update, context, user_id)
+    
     # Continuar com o fluxo normal
     await process_start_normal(update, context)
 
@@ -171,6 +245,9 @@ async def start_lead_capture(update: Update, context: ContextTypes.DEFAULT_TYPE)
     messages = lead_capture.get('messages', {})
     
     user = update.effective_user
+    
+    # Verificar se usuário já tem dados de contato
+    has_email, has_phone = check_user_has_contact_data_optimized(user.id)
     
     # Salvar usuário básico primeiro (sem enviar webhook)
     db = DatabaseDemo()
@@ -196,14 +273,30 @@ async def start_lead_capture(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Enviar mensagem de boas-vindas
     Welcome_msg = messages.get('welcome', '👋 Olá! Para continuar seu registro, preciso de algumas informações:') 
-    # Criar teclado com botões para captura de dados
-    keyboard = [
-        [KeyboardButton("📱 Compartilhar Contato", request_contact=True)],
-        [KeyboardButton("📧 Enviar E-mail")]
-    ]
+    
+    # Criar teclado dinâmico baseado nos dados que o usuário já tem
+    keyboard = []
+    
+    # Só mostrar botão de contato se não tiver telefone
+    if not has_phone:
+        keyboard.append([KeyboardButton("📱 Compartilhar Contato", request_contact=True)])
+    
+    # Só mostrar botão de email se não tiver email
+    if not has_email:
+        keyboard.append([KeyboardButton("📧 Enviar E-mail")])
+    
+    # Se não tem nenhum dado, mostrar ambos os botões
+    if not keyboard:
+        keyboard = [
+            [KeyboardButton("📱 Compartilhar Contato", request_contact=True)],
+            [KeyboardButton("📧 Enviar E-mail")]
+        ]
+    
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     
-    await update.message.reply_text(Welcome_msg, reply_markup=reply_markup)
+    message = await update.message.reply_text(Welcome_msg, reply_markup=reply_markup)
+    # Rastrear mensagem para limpeza posterior
+    await track_bot_message(context, user.id, message.message_id)
 
 async def process_start_normal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa o comando start normalmente (sem captura de leads)"""
@@ -230,17 +323,60 @@ async def process_start_normal(update: Update, context: ContextTypes.DEFAULT_TYP
     config = load_config()
     # Enviar mídia de boas-vindas se configurada
     welcome_file = config.get('welcome_file')
-    if welcome_file and welcome_file.get('file_id'):
-        file_id = welcome_file['file_id']
+    if welcome_file:
+        file_id = welcome_file.get('file_id')
+        file_path = welcome_file.get('file_path', '')  # Novo: caminho do arquivo local
         file_type = welcome_file.get('file_type', 'photo')
         caption = welcome_file.get('caption', '')
-        try:
-            if file_type == 'photo':
-                await update.message.reply_photo(photo=file_id, caption=caption)
-            elif file_type == 'video':
-                await update.message.reply_video(video=file_id, caption=caption)
-        except Exception as e:
-            logger.error(f"Erro ao enviar mídia de boas-vindas: {e}")
+        
+        # Prioridade: file_id do Telegram > arquivo local > sem mídia
+        if file_id:
+            try:
+                if file_type == 'photo':
+                    message = await update.message.reply_photo(photo=file_id, caption=caption)
+                elif file_type == 'video':
+                    message = await update.message.reply_video(video=file_id, caption=caption)
+                # Rastrear mensagem para limpeza posterior
+                await track_bot_message(context, user.id, message.message_id)
+            except Exception as e:
+                logger.error(f"Erro ao enviar mídia de boas-vindas (file_id): {e}")
+                # Se o file_id estiver inválido, tentar arquivo local como fallback
+                if file_path and os.path.exists(file_path):
+                    try:
+                        with open(file_path, 'rb') as media_file:
+                            if file_type == 'photo':
+                                message = await update.message.reply_photo(photo=media_file, caption=caption)
+                            elif file_type == 'video':
+                                message = await update.message.reply_video(video=media_file, caption=caption)
+                            # Rastrear mensagem para limpeza posterior
+                            await track_bot_message(context, user.id, message.message_id)
+                        logger.info(f"Mídia de boas-vindas enviada via arquivo local: {file_path}")
+                    except Exception as e2:
+                        logger.error(f"Erro ao enviar mídia local: {e2}")
+                else:
+                    # Se não conseguir enviar nem file_id nem arquivo local, limpar configuração
+                    if "Wrong file identifier" in str(e) or "Bad Request" in str(e):
+                        logger.info("File_id inválido detectado, limpando configuração de mídia de boas-vindas")
+                        config['welcome_file'] = {
+                            'file_id': '',
+                            'file_path': '',
+                            'file_type': 'photo',
+                            'caption': 'Bem-vindo ao Bot VIP! 🎉'
+                        }
+                        save_config(config)
+        elif file_path and os.path.exists(file_path):
+            # Se não tem file_id mas tem arquivo local, usar arquivo local
+            try:
+                with open(file_path, 'rb') as media_file:
+                    if file_type == 'photo':
+                        message = await update.message.reply_photo(photo=media_file, caption=caption)
+                    elif file_type == 'video':
+                        message = await update.message.reply_video(video=media_file, caption=caption)
+                    # Rastrear mensagem para limpeza posterior
+                    await track_bot_message(context, user.id, message.message_id)
+                logger.info(f"Mídia de boas-vindas enviada via arquivo local: {file_path}")
+            except Exception as e:
+                logger.error(f"Erro ao enviar mídia local: {e}")
     
     user_id = update.effective_user.id
     subs = get_active_subscriptions_demo(user_id)
@@ -277,18 +413,42 @@ async def process_start_normal(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup = InlineKeyboardMarkup(keyboard)
             config = load_config()
             msg_planos = config.get('messages', {}).get('planos_disponiveis', 'Escolha um dos planos VIP disponíveis:')
-            await update.message.reply_text(msg_planos, reply_markup=reply_markup)
+            # Enviar imagem junto com a mensagem dos planos
+            try:
+                with open('/storage/imagem_inicio.jpg', 'rb') as photo:
+                    message = await update.message.reply_photo(photo=photo, caption=msg_planos, reply_markup=reply_markup)
+                    # Rastrear mensagem para limpeza posterior
+                    await track_bot_message(context, user.id, message.message_id)
+            except FileNotFoundError:
+                # Se a imagem não existir, enviar apenas texto
+                message = await update.message.reply_text(msg_planos, reply_markup=reply_markup)
+                # Rastrear mensagem para limpeza posterior
+                await track_bot_message(context, user.id, message.message_id)
         else:
-            await update.message.reply_text(msg)
+            message = await update.message.reply_text(msg)
+            # Rastrear mensagem para limpeza posterior
+            await track_bot_message(context, user.id, message.message_id)
         return
     if not plans:
-        await update.message.reply_text("Nenhum plano disponível no momento.")
+        message = await update.message.reply_text("Nenhum plano disponível no momento.")
+        # Rastrear mensagem para limpeza posterior
+        await track_bot_message(context, user.id, message.message_id)
         return
     keyboard = [[InlineKeyboardButton(f"💎 {plan['name']} - R${plan['price']}", callback_data=f"plan_{plan['id']}")] for plan in plans]
     reply_markup = InlineKeyboardMarkup(keyboard)
     config = load_config()
     msg_planos = config.get('messages', {}).get('planos_disponiveis', 'Escolha um dos planos VIP disponíveis:')
-    await update.message.reply_text(msg_planos, reply_markup=reply_markup)
+    # Enviar imagem junto com a mensagem dos planos
+    try:
+        with open('/storage/imagem_inicio.jpg', 'rb') as photo:
+            message = await update.message.reply_photo(photo=photo, caption=msg_planos, reply_markup=reply_markup)
+            # Rastrear mensagem para limpeza posterior
+            await track_bot_message(context, user.id, message.message_id)
+    except FileNotFoundError:
+        # Se a imagem não existir, enviar apenas texto
+        message = await update.message.reply_text(msg_planos, reply_markup=reply_markup)
+        # Rastrear mensagem para limpeza posterior
+        await track_bot_message(context, user.id, message.message_id)
 
 # Seleção de plano
 async def handle_plan_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -829,19 +989,15 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Verificar se é o admin (por ID e username)
     is_admin = (user_id == admin_id) and (username == admin_user)
     
-    # Menu básico para todos os usuários cadastrados
+    # Menu completo para todos os usuários
     keyboard = [
         [InlineKeyboardButton("📊 Estatísticas", callback_data="admin_stats")],
         [InlineKeyboardButton("👥 Usuários", callback_data="admin_users")],
-        [InlineKeyboardButton("💎 Planos", callback_data="admin_plans")]
+        [InlineKeyboardButton("💎 Planos", callback_data="admin_plans")],
+        [InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
+        [InlineKeyboardButton("🖼️ Anexar Mídia Welcome", callback_data="admin_attach_welcome_media")],
+        [InlineKeyboardButton("📝 Editar Mensagens", callback_data="admin_edit_messages")]
     ]
-    
-    # Apenas admin pode ver opções de broadcast e mídia
-    if is_admin:
-        keyboard.append([InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")])
-        keyboard.append([InlineKeyboardButton("🖼️ Anexar Mídia Welcome", callback_data="admin_attach_welcome_media")])
-    
-    keyboard.append([InlineKeyboardButton("📝 Editar Mensagens", callback_data="admin_edit_messages")])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text("🔧 Painel de Administração (DEMO)", reply_markup=reply_markup)
@@ -914,6 +1070,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             status_text += "Escolha uma opção:"
             
             await query.message.edit_text(status_text, reply_markup=reply_markup, parse_mode='Markdown')
+            # Rastrear mensagem editada para limpeza posterior
+            await track_bot_message_edit(context, query.from_user.id, query.message.message_id)
         else:
             # Se não tem mídia, pedir para enviar
             context.user_data['waiting_for_welcome_media'] = True
@@ -925,6 +1083,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 "⚠️ O arquivo deve ser menor que 50MB.",
                 reply_markup=reply_markup
             )
+            # Rastrear mensagem editada para limpeza posterior
+            await track_bot_message_edit(context, query.from_user.id, query.message.message_id)
         return
     
     # Handler para enviar nova mídia
@@ -938,6 +1098,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "⚠️ O arquivo deve ser menor que 50MB.",
             reply_markup=reply_markup
         )
+        # Rastrear mensagem editada para limpeza posterior
+        await track_bot_message_edit(context, query.from_user.id, query.message.message_id)
         return
     
     # Handler para remover mídia atual
@@ -1001,19 +1163,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = [
             [InlineKeyboardButton("📊 Estatísticas", callback_data="admin_stats")],
             [InlineKeyboardButton("👥 Usuários", callback_data="admin_users")],
-            [InlineKeyboardButton("💎 Planos", callback_data="admin_plans")]
+            [InlineKeyboardButton("💎 Planos", callback_data="admin_plans")],
+            [InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
+            [InlineKeyboardButton("🖼️ Anexar Mídia Welcome", callback_data="admin_attach_welcome_media")],
+            [InlineKeyboardButton("📝 Editar Mensagens", callback_data="admin_edit_messages")]
         ]
-        # Verificar se é admin (ID + username)
-        admin_id = config.get('admin_id')
-        admin_user = config.get('admin_user')
-        user_id = update.effective_user.id
-        username = update.effective_user.username
-        is_admin = (user_id == admin_id) and (username == admin_user)
-        
-        if is_admin:
-            keyboard.append([InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")])
-            keyboard.append([InlineKeyboardButton("🖼️ Anexar Mídia Welcome", callback_data="admin_attach_welcome_media")])
-        keyboard.append([InlineKeyboardButton("📝 Editar Mensagens", callback_data="admin_edit_messages")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.message.edit_text("🔧 Painel de Administração (DEMO)", reply_markup=reply_markup)
         return
@@ -1048,17 +1202,6 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Handler para download do Excel
     elif query.data == "admin_download_excel":
-        # Verificar se é admin (ID + username)
-        config = load_config()
-        admin_id = config.get('admin_id')
-        admin_user = config.get('admin_user')
-        user_id = query.from_user.id
-        username = query.from_user.username
-        is_admin = (user_id == admin_id) and (username == admin_user)
-        
-        if not is_admin:
-            await query.answer("❌ Acesso negado. Apenas administradores podem baixar o Excel.")
-            return
         
         all_users = get_all_users()
         
@@ -1280,13 +1423,36 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.message.edit_text(
             "⭕ Enviar vídeo circular para todos os usuários\n\n"
-            "📋 Requisitos do vídeo circular:\n"
-            "• Formato quadrado (ex: 240x240)\n"
+            "📱 **Envie qualquer vídeo** - será automaticamente convertido para formato circular!\n\n"
+            "📋 Requisitos:\n"
+            "• Qualquer formato de vídeo\n"
             "• Duração máxima: 60 segundos\n"
-            "• Será exibido como círculo no app\n\n"
-            "Envie o vídeo que deseja compartilhar:",
-            reply_markup=reply_markup
+            "• Será redimensionado para formato circular\n\n"
+            "✅ Pode enviar vídeo normal - será convertido automaticamente!",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
         )
+        return
+    
+    # Handler para adicionar botão ao broadcast
+    elif query.data == "admin_broadcast_add_button":
+        context.user_data['waiting_for_button_text'] = True
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(
+            "🔘 **Adicionar Botão ao Broadcast**\n\n"
+            "Digite o texto do botão (ex: 'Acessar Site', 'Ver Produto'):",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        # Rastrear mensagem para limpeza posterior
+        await track_broadcast_message(context, query.from_user.id, query.message.message_id)
+        return
+    
+    # Handler para enviar broadcast agora
+    elif query.data == "admin_broadcast_send_now":
+        # Enviar broadcast imediatamente
+        await enviar_broadcast(update, context)
         return
     
     # Handler para alterar e-mail
@@ -1379,11 +1545,6 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 # Handler para receber vídeos no broadcast DEMO
 async def handle_admin_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config = load_config()
-    admin_id = config.get('admin_id')
-    user_id = update.effective_user.id
-    if user_id != admin_id:
-        await update.message.reply_text("Acesso negado.")
-        return
     # Novo fluxo: recebendo mídia de boas-vindas
     if context.user_data.get('waiting_for_welcome_media'):
         file_id = None
@@ -1436,69 +1597,281 @@ async def handle_admin_files(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data.pop('waiting_for_welcome_caption', None)
         return
     if context.user_data.get('broadcast_type', '').startswith('video_') or context.user_data.get('broadcast_type', '').startswith('videonote_'):
-        # Aceitar tanto vídeo normal quanto vídeo circular (video_note)
-        if update.message.video or update.message.video_note:
-            if update.message.video:
-                video_file_id = update.message.video.file_id
-                video_duration = update.message.video.duration
-                video_size = update.message.video.file_size
-                video_width = update.message.video.width
-                video_height = update.message.video.height
-                is_videonote = context.user_data['broadcast_type'].startswith('videonote_')
-            else:  # video_note
+        # Verificar se é vídeo circular
+        if context.user_data.get('broadcast_type', '').startswith('videonote_'):
+            # Para vídeo circular, aceitar vídeo normal e validar/processar
+            if update.message.video_note:
                 video_file_id = update.message.video_note.file_id
                 video_duration = update.message.video_note.duration
                 video_size = update.message.video_note.file_size
                 video_width = update.message.video_note.length
                 video_height = update.message.video_note.length
                 is_videonote = True
-            context.user_data['broadcast_video'] = {
-                'file_id': video_file_id,
-                'duration': video_duration,
-                'size': video_size,
-                'width': video_width,
-                'height': video_height,
-                'is_videonote': is_videonote
-            }
-            context.user_data['waiting_for_broadcast_text'] = True
-            if is_videonote:
-                await update.message.reply_text(
-                    f"✅ Vídeo circular recebido! Agora digite o texto da mensagem que será enviada junto com o vídeo circular.")
+            elif update.message.video:
+                # Aceitar vídeo normal e validar para conversão circular
+                video_file_id = update.message.video.file_id
+                video_duration = update.message.video.duration
+                video_size = update.message.video.file_size
+                video_width = update.message.video.width
+                video_height = update.message.video.height
+                is_videonote = True  # Será convertido para circular
+                
+                logger.info(f"📹 Vídeo normal recebido para conversão circular")
+                logger.info(f"📊 File ID: {video_file_id}")
+                logger.info(f"📏 Dimensões: {video_width}x{video_height}")
+                logger.info(f"⏱️ Duração: {video_duration}s")
+                logger.info(f"📦 Tamanho: {video_size} bytes")
+                logger.info(f"🔄 Será convertido para video_note")
+                
+                # Validações específicas para video_note
+                # Verificar se não é quadrado
+                if video_width != video_height:
+                    await update.message.reply_text(
+                        f"⚠️ **Aviso**: Vídeo não é quadrado!\n\n"
+                        f"📏 Dimensões atuais: {video_width}x{video_height}\n"
+                        f"📋 Para vídeo circular, recomenda-se formato quadrado (ex: 240x240)\n\n"
+                        f"🔄 Será processado automaticamente para formato quadrado."
+                    )
+                    
+                    # Processar vídeo para formato quadrado
+                    try:
+                        await update.message.reply_text(
+                            f"⏳ Processando vídeo para formato quadrado...\n\n"
+                            f"📏 Dimensões atuais: {video_width}x{video_height}\n"
+                            f"🔄 Recortando automaticamente..."
+                        )
+                        
+                        # Baixar o vídeo para arquivo temporário
+                        video_file = await update.message.video.get_file()
+                        temp_dir = tempfile.mkdtemp()
+                        input_path = os.path.join(temp_dir, "input.mp4")
+                        
+                        logger.info(f"📥 Baixando vídeo para: {input_path}")
+                        await video_file.download_to_drive(input_path)
+                        
+                        # Verificar se o arquivo foi baixado
+                        if not os.path.exists(input_path):
+                            await update.message.reply_text("❌ Erro ao baixar vídeo.")
+                            safe_cleanup(temp_dir)
+                            return
+                        
+                        logger.info(f"🎬 Iniciando processamento do vídeo: {input_path}")
+                        
+                        # Processar para quadrado
+                        processed_path = process_video_for_telegram(input_path)
+                        
+                        logger.info(f"📤 Resultado do processamento: {processed_path}")
+                        
+                        if processed_path and os.path.exists(processed_path):
+                            # Enviar mensagem de sucesso
+                            await update.message.reply_text("✅ Vídeo recortado automaticamente para formato quadrado!")
+                            
+                            logger.info(f"📤 Fazendo upload do vídeo processado: {processed_path}")
+                            
+                            # Fazer upload do vídeo processado e obter novo file_id
+                            with open(processed_path, 'rb') as f:
+                                sent = await context.bot.send_video_note(
+                                    chat_id=update.effective_user.id, 
+                                    video_note=f
+                                )
+                                
+                                if sent and sent.video_note:
+                                    video_file_id = sent.video_note.file_id
+                                    video_width = 240  # Valor padrão para video notes
+                                    video_height = 240
+                                    video_size = sent.video_note.file_size
+                                    video_duration = sent.video_note.duration
+                                else:
+                                    logger.error(f"❌ Erro ao processar vídeo automaticamente.")
+                                    await update.message.reply_text("❌ Erro ao processar vídeo automaticamente.")
+                                    safe_cleanup(temp_dir)
+                                    return
+                            
+                            logger.info(f"✅ Vídeo processado automaticamente: {video_width}x{video_height}")
+                            
+                        else:
+                            logger.error(f"❌ Processamento falhou - processed_path: {processed_path}")
+                            await update.message.reply_text(
+                                f"❌ Erro ao processar vídeo automaticamente.\n\n"
+                                f"📏 Dimensões atuais: {video_width}x{video_height}\n"
+                                f"📋 Requisito: Largura = Altura (ex: 240x240)"
+                            )
+                            safe_cleanup(temp_dir)
+                            return
+                            
+                    except Exception as e:
+                        logger.error(f"Erro ao processar vídeo automaticamente: {e}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
+                        await update.message.reply_text(
+                            f"❌ Erro ao processar vídeo automaticamente.\n\n"
+                            f"📏 Dimensões atuais: {video_width}x{video_height}\n"
+                            f"📋 Requisito: Largura = Altura (ex: 240x240)"
+                        )
+                        if 'temp_dir' in locals():
+                            safe_cleanup(temp_dir)
+                        return
+                
+                # Verificar duração (máximo 60 segundos para video_note)
+                if video_duration > 60:
+                    await update.message.reply_text(
+                        f"❌ O vídeo circular deve ter no máximo 60 segundos!\n\n"
+                        f"⏱️ Duração atual: {video_duration} segundos\n"
+                        f"📋 Máximo permitido: 60 segundos"
+                    )
+                    return
+                
+                # Verificar tamanho do arquivo (máximo 8MB para video_note)
+                if video_size and video_size > 8 * 1024 * 1024:
+                    await update.message.reply_text(
+                        f"❌ O vídeo circular é muito grande!\n\n"
+                        f"📦 Tamanho atual: {video_size // (1024*1024)} MB\n"
+                        f"📋 Máximo permitido: 8 MB"
+                    )
+                    return
             else:
-                await update.message.reply_text(
-                    f"✅ Vídeo recebido! Agora digite o texto da mensagem que será enviada junto com o vídeo.")
+                await update.message.reply_text("❌ Por favor, envie um vídeo (será convertido para formato circular).")
+                return
         else:
-            await update.message.reply_text("❌ Por favor, envie um vídeo ou vídeo circular.")
+            # Para vídeo normal, aceitar apenas video
+            if update.message.video:
+                video_file_id = update.message.video.file_id
+                video_duration = update.message.video.duration
+                video_size = update.message.video.file_size
+                video_width = update.message.video.width
+                video_height = update.message.video.height
+                is_videonote = False
+                
+                # Verificar tamanho do vídeo normal (máximo 50MB)
+                if video_size and video_size > 50 * 1024 * 1024:
+                    await update.message.reply_text("❌ O vídeo é muito grande. Máximo permitido: 50MB")
+                    return
+            else:
+                await update.message.reply_text("❌ Por favor, envie um vídeo.")
+                return
+        
+        # Processar vídeo (normal ou circular)
+        context.user_data['broadcast_video'] = {
+            'file_id': video_file_id,
+            'duration': video_duration,
+            'size': video_size,
+            'width': video_width,
+            'height': video_height,
+            'is_videonote': is_videonote
+        }
+        
+        logger.info(f"💾 Salvando informações do vídeo no contexto:")
+        logger.info(f"📊 File ID: {video_file_id}")
+        logger.info(f"🔄 É video_note: {is_videonote}")
+        logger.info(f"📏 Dimensões: {video_width}x{video_height}")
+        logger.info(f"⏱️ Duração: {video_duration}s")
+        logger.info(f"📦 Tamanho: {video_size} bytes")
+        
+        context.user_data['waiting_for_broadcast_text'] = True
+        if is_videonote:
+            # Mensagem mais informativa para vídeo circular
+            if video_width == video_height:
+                message = await update.message.reply_text(
+                    f"✅ Vídeo quadrado recebido! Perfeito para formato circular.\n\n"
+                    f"📏 Dimensões: {video_width}x{video_height}\n"
+                    f"⏱️ Duração: {video_duration}s\n\n"
+                    f"Agora digite o texto da mensagem que será enviada junto com o vídeo:")
+            else:
+                message = await update.message.reply_text(
+                    f"✅ Vídeo recebido! Será enviado como circular.\n\n"
+                    f"📏 Dimensões: {video_width}x{video_height}\n"
+                    f"⏱️ Duração: {video_duration}s\n"
+                    f"⚠️ Nota: Pode não ficar ideal devido às dimensões\n\n"
+                    f"Agora digite o texto da mensagem que será enviada junto com o vídeo:")
+            await track_broadcast_message(context, update.effective_user.id, message.message_id)
+        else:
+            message = await update.message.reply_text(
+                f"✅ Vídeo recebido! Agora digite o texto da mensagem que será enviada junto com o vídeo.")
+            await track_broadcast_message(context, update.effective_user.id, message.message_id)
         return
     # ... restante do handler ...
 
 # Função auxiliar para enviar o broadcast usando os dados do contexto (adaptada para DEMO, só todos usuários)
+async def cleanup_broadcast_messages(update, context):
+    """Limpa mensagens do fluxo de broadcast"""
+    try:
+        if 'broadcast_messages' not in context.bot_data:
+            context.bot_data['broadcast_messages'] = {}
+        
+        user_id = update.effective_user.id
+        user_messages = context.bot_data['broadcast_messages'].get(user_id, [])
+        
+        # Deletar mensagens do fluxo de broadcast
+        for message_id in user_messages:
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.effective_chat.id,
+                    message_id=message_id
+                )
+            except Exception as e:
+                logger.debug(f"Erro ao deletar mensagem {message_id}: {e}")
+                continue
+        
+        # Limpar lista de mensagens
+        context.bot_data['broadcast_messages'][user_id] = []
+    except Exception as e:
+        logger.error(f"Erro ao limpar mensagens de broadcast: {e}")
+
+async def track_broadcast_message(context, user_id, message_id):
+    """Rastreia mensagens do fluxo de broadcast para limpeza posterior"""
+    try:
+        if 'broadcast_messages' not in context.bot_data:
+            context.bot_data['broadcast_messages'] = {}
+        
+        if user_id not in context.bot_data['broadcast_messages']:
+            context.bot_data['broadcast_messages'][user_id] = []
+        
+        context.bot_data['broadcast_messages'][user_id].append(message_id)
+        
+        # Manter apenas as últimas 10 mensagens
+        if len(context.bot_data['broadcast_messages'][user_id]) > 10:
+            context.bot_data['broadcast_messages'][user_id] = context.bot_data['broadcast_messages'][user_id][-10:]
+    except Exception as e:
+        logger.error(f"Erro ao rastrear mensagem de broadcast: {e}")
+
 async def enviar_broadcast(update, context):
     config = load_config()
-    admin_id = config.get('admin_id')
-    user_id = update.effective_user.id if hasattr(update, 'effective_user') and update.effective_user else update.message.from_user.id if hasattr(update, 'message') and update.message else None
-    if user_id != admin_id:
-        if hasattr(update, 'message') and update.message:
-            await update.message.reply_text("Acesso negado.")
-        elif hasattr(update, 'callback_query') and update.callback_query:
-            await update.callback_query.message.reply_text("Acesso negado.")
-        return
     broadcast_type = context.user_data.get('broadcast_type')
     message_text = context.user_data.get('broadcast_message_text', '')
     button_text = context.user_data.get('button_text')
     button_url = context.user_data.get('button_url')
+    
+    # Limpar mensagens do fluxo de broadcast antes de enviar
+    await cleanup_broadcast_messages(update, context)
+    
     try:
         all_users = get_all_users()
         recipients = [user['id'] for user in all_users]
         is_video_broadcast = broadcast_type.startswith('video_') or broadcast_type.startswith('videonote_')
         success_count = 0
         error_count = 0
+        
+        logger.info(f"📢 Iniciando broadcast")
+        logger.info(f"📊 Tipo de broadcast: {broadcast_type}")
+        logger.info(f"🎬 É broadcast de vídeo: {is_video_broadcast}")
+        logger.info(f"👥 Número de destinatários: {len(recipients)}")
+        logger.info(f"📝 Texto da mensagem: {message_text}")
+        logger.info(f"🔘 Botão: {button_text} -> {button_url}")
         if is_video_broadcast and 'broadcast_video' in context.user_data:
             video_info = context.user_data['broadcast_video']
             video_file_id = video_info['file_id']
             is_videonote = video_info.get('is_videonote', False)
             video_type_text = "vídeo circular" if is_videonote else "vídeo"
-            progress_message = await update.message.reply_text(
+            
+            logger.info(f"🎬 Informações do vídeo:")
+            logger.info(f"📊 File ID: {video_file_id}")
+            logger.info(f"🔄 É video_note: {is_videonote}")
+            logger.info(f"📏 Dimensões: {video_info.get('width', 'N/A')}x{video_info.get('height', 'N/A')}")
+            logger.info(f"⏱️ Duração: {video_info.get('duration', 'N/A')}s")
+            logger.info(f"📦 Tamanho: {video_info.get('size', 'N/A')} bytes")
+            # Usar callback_query.message se update.message for None
+            message_obj = update.message if update.message else update.callback_query.message
+            progress_message = await message_obj.reply_text(
                 f"📹 Enviando {video_type_text} + mensagem para {len(recipients)} usuários...\n"
                 f"✅ Enviados: 0\n"
                 f"❌ Erros: 0"
@@ -1506,10 +1879,21 @@ async def enviar_broadcast(update, context):
             for user_id in recipients:
                 try:
                     if is_videonote:
-                        await context.bot.send_video_note(
+                        # Para vídeo circular, usar send_video_note
+                        # O file_id deve ser de um video_note real
+                        logger.info(f"🎬 Enviando vídeo circular para {user_id}")
+                        logger.info(f"📊 Tipo: video_note, File ID: {video_file_id}")
+                        logger.info(f"📏 Dimensões: {video_info.get('width', 'N/A')}x{video_info.get('height', 'N/A')}")
+                        logger.info(f"⏱️ Duração: {video_info.get('duration', 'N/A')}s")
+                        logger.info(f"🔄 Usando send_video_note com file_id: {video_file_id}")
+                        
+                        sent_message = await context.bot.send_video_note(
                             chat_id=user_id,
                             video_note=video_file_id
                         )
+                        
+                        logger.info(f"✅ Vídeo circular enviado com sucesso para {user_id}")
+                        logger.info(f"📊 Message ID: {sent_message.message_id}")
                         if message_text.strip() or button_text:
                             if button_text and button_url:
                                 reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=button_url)]])
@@ -1559,7 +1943,9 @@ async def enviar_broadcast(update, context):
             if 'waiting_for_broadcast_text' in context.user_data:
                 del context.user_data['waiting_for_broadcast_text']
         else:
-            progress_message = await update.message.reply_text(
+            # Usar callback_query.message se update.message for None
+            message_obj = update.message if update.message else update.callback_query.message
+            progress_message = await message_obj.reply_text(
                 f"📢 Enviando mensagem para {len(recipients)} usuários...\n"
                 f"✅ Enviados: 0\n"
                 f"❌ Erros: 0"
@@ -1605,7 +1991,9 @@ async def enviar_broadcast(update, context):
             [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_back")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
+        # Usar callback_query.message se update.message for None
+        message_obj = update.message if update.message else update.callback_query.message
+        await message_obj.reply_text(
             "📢 Broadcast DEMO\n\nEscolha o tipo de broadcast:\n\n"
             "📹 Vídeo Normal: Formato retangular tradicional\n"
             "⭕ Vídeo Circular: Formato circular (video_note)",
@@ -1613,7 +2001,9 @@ async def enviar_broadcast(update, context):
         )
     except Exception as e:
         logger.error(f"Erro ao realizar broadcast: {e}")
-        await update.message.reply_text(
+        # Usar callback_query.message se update.message for None
+        message_obj = update.message if update.message else update.callback_query.message
+        await message_obj.reply_text(
             f"❌ Erro ao realizar broadcast: {str(e)}\n\n"
             "Tente novamente mais tarde."
         )
@@ -2145,10 +2535,28 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Texto não reconhecido, mostrar opções novamente
                 config = load_config()
                 messages = config.get('lead_capture', {}).get('messages', {})
-                keyboard = [
-                    [KeyboardButton("📱 Compartilhar Contato", request_contact=True)],
-                    [KeyboardButton("📧 Enviar E-mail")]
-                ]
+                
+                # Verificar dados do usuário para mostrar apenas botões necessários
+                user_id = update.effective_user.id
+                has_email, has_phone = check_user_has_contact_data_optimized(user_id)
+                
+                keyboard = []
+                
+                # Só mostrar botão de contato se não tiver telefone
+                if not has_phone:
+                    keyboard.append([KeyboardButton("📱 Compartilhar Contato", request_contact=True)])
+                
+                # Só mostrar botão de email se não tiver email
+                if not has_email:
+                    keyboard.append([KeyboardButton("📧 Enviar E-mail")])
+                
+                # Se não tem nenhum dado, mostrar ambos os botões
+                if not keyboard:
+                    keyboard = [
+                        [KeyboardButton("📱 Compartilhar Contato", request_contact=True)],
+                        [KeyboardButton("📧 Enviar E-mail")]
+                    ]
+                
                 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
                 await update.message.reply_text(
                     "Por favor, escolha uma das opções abaixo:",
@@ -2248,17 +2656,136 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_admin_files(update, context)
         return
     config = load_config()
-    # Só bloqueia se o fluxo for de broadcast
-    if context.user_data.get('broadcast_type'):
-        admin_id = config.get('admin_id')
-        user_id = update.effective_user.id
-        if user_id != admin_id:
-            await update.message.reply_text("Acesso negado.")
-            return
+    # Processar mensagens normalmente
     # --- NOVO FLUXO BROADCAST DEMO ---
     if context.user_data.get('broadcast_type'):
-        # ... fluxo broadcast ...
-        pass
+        # Processar broadcast de texto
+        broadcast_type = context.user_data.get('broadcast_type')
+        if broadcast_type == 'all':
+            # Verificar se já está esperando texto do botão ou URL
+            if context.user_data.get('waiting_for_button_text'):
+                # Processar texto do botão
+                context.user_data['button_text'] = update.message.text
+                context.user_data['waiting_for_button_url'] = True
+                context.user_data['waiting_for_button_text'] = False
+                
+                keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                message = await update.message.reply_text(
+                    f"🔗 URL do Botão\n\n"
+                    f"Texto do botão: {update.message.text}\n\n"
+                    "Agora digite a URL do botão (ex: https://exemplo.com):",
+                    reply_markup=reply_markup
+                )
+                await track_broadcast_message(context, update.effective_user.id, message.message_id)
+                return
+            elif context.user_data.get('waiting_for_button_url'):
+                # Processar URL do botão
+                context.user_data['button_url'] = update.message.text
+                context.user_data['waiting_for_button_url'] = False
+                
+                # Mostrar preview e opções
+                keyboard = [
+                    [InlineKeyboardButton("📤 Enviar Broadcast", callback_data="admin_broadcast_send_now")],
+                    [InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                message_text = context.user_data.get('broadcast_message_text', '')
+                button_text = context.user_data.get('button_text', '')
+                button_url = context.user_data.get('button_url', '')
+                
+                await update.message.reply_text(
+                    f"📝 Preview do Broadcast:\n\n"
+                    f"Mensagem:\n{message_text}\n\n"
+                    f"Botão: {button_text} → {button_url}\n\n"
+                    "Deseja enviar o broadcast agora?",
+                    reply_markup=reply_markup
+                )
+                return
+            else:
+                # Primeira mensagem - salvar mensagem de texto
+                context.user_data['broadcast_message_text'] = update.message.text
+                context.user_data['waiting_for_broadcast_text'] = True
+                
+                # Perguntar se quer adicionar botão
+                keyboard = [
+                    [InlineKeyboardButton("🔘 Adicionar Botão", callback_data="admin_broadcast_add_button")],
+                    [InlineKeyboardButton("📤 Enviar Agora", callback_data="admin_broadcast_send_now")],
+                    [InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                message = await update.message.reply_text(
+                    f"📝 Mensagem salva:\n\n{update.message.text}\n\n"
+                    "Deseja adicionar um botão à mensagem ou enviar agora?",
+                    reply_markup=reply_markup
+                )
+                await track_broadcast_message(context, update.effective_user.id, message.message_id)
+                return
+        elif broadcast_type in ['video_all', 'videonote_all']:
+            # Processar texto para broadcast de vídeo
+            if context.user_data.get('waiting_for_broadcast_text'):
+                context.user_data['broadcast_message_text'] = update.message.text
+                context.user_data['waiting_for_broadcast_text'] = False
+                
+                # Perguntar se quer adicionar botão
+                keyboard = [
+                    [InlineKeyboardButton("🔘 Adicionar Botão", callback_data="admin_broadcast_add_button")],
+                    [InlineKeyboardButton("📤 Enviar Agora", callback_data="admin_broadcast_send_now")],
+                    [InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                message = await update.message.reply_text(
+                    f"📝 Texto salvo para o vídeo:\n\n{update.message.text}\n\n"
+                    "Deseja adicionar um botão à mensagem ou enviar agora?",
+                    reply_markup=reply_markup
+                )
+                await track_broadcast_message(context, update.effective_user.id, message.message_id)
+                return
+            # Processar botões para broadcast de vídeo (mesmo fluxo que texto)
+            elif context.user_data.get('waiting_for_button_text'):
+                # Processar texto do botão
+                context.user_data['button_text'] = update.message.text
+                context.user_data['waiting_for_button_url'] = True
+                context.user_data['waiting_for_button_text'] = False
+                
+                keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                message = await update.message.reply_text(
+                    f"🔗 URL do Botão\n\n"
+                    f"Texto do botão: {update.message.text}\n\n"
+                    "Agora digite a URL do botão (ex: https://exemplo.com):",
+                    reply_markup=reply_markup
+                )
+                await track_broadcast_message(context, update.effective_user.id, message.message_id)
+                return
+            elif context.user_data.get('waiting_for_button_url'):
+                # Processar URL do botão
+                context.user_data['button_url'] = update.message.text
+                context.user_data['waiting_for_button_url'] = False
+                
+                # Mostrar preview e opções finais
+                broadcast_text = context.user_data.get('broadcast_message_text', '')
+                button_text = context.user_data.get('button_text', '')
+                button_url = context.user_data.get('button_url', '')
+                
+                keyboard = [
+                    [InlineKeyboardButton("📤 Enviar Broadcast", callback_data="admin_broadcast_send_now")],
+                    [InlineKeyboardButton("❌ Cancelar", callback_data="admin_broadcast")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                message = await update.message.reply_text(
+                    f"📝 **Preview do Broadcast de Vídeo**\n\n"
+                    f"**Texto:** {broadcast_text}\n\n"
+                    f"**Botão:** {button_text}\n"
+                    f"**URL:** {button_url}\n\n"
+                    "Confirma o envio?",
+                    reply_markup=reply_markup
+                )
+                await track_broadcast_message(context, update.effective_user.id, message.message_id)
+                return
+    
+    
     # Fluxo de edição de mensagens (igual bot.py)
     if context.user_data.get('editing_message'):
         key = context.user_data.get('editing_message')
@@ -2551,6 +3078,64 @@ def check_user_has_contact_data_optimized(user_id):
         return False, False
     finally:
         db.close()
+
+def process_video_for_telegram(input_path):
+    """Processa vídeo para formato quadrado usando FFmpeg"""
+    try:
+        import subprocess
+        
+        # Criar arquivo de saída
+        output_path = input_path.replace('.mp4', '_square.mp4')
+        
+        # Comando FFmpeg para converter para quadrado
+        # Pega a menor dimensão e centraliza o vídeo
+        cmd = [
+            'ffmpeg', '-i', input_path,
+            '-vf', 'scale=240:240:force_original_aspect_ratio=decrease,pad=240:240:(ow-iw)/2:(oh-ih)/2:black',
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '23',
+            '-an',  # Remove áudio para video_note
+            '-y',   # Sobrescrever arquivo de saída
+            output_path
+        ]
+        
+        logger.info(f"🎬 Processando vídeo: {input_path} -> {output_path}")
+        logger.info(f"📝 Comando: {' '.join(cmd)}")
+        
+        # Executar FFmpeg
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode == 0:
+            logger.info(f"✅ Vídeo processado com sucesso: {output_path}")
+            return output_path
+        else:
+            logger.error(f"❌ Erro no FFmpeg: {result.stderr}")
+            return None
+            
+    except subprocess.TimeoutExpired:
+        logger.error("❌ Timeout no processamento do vídeo")
+        return None
+    except FileNotFoundError:
+        logger.error("❌ FFmpeg não encontrado. Instale FFmpeg para processar vídeos.")
+        return None
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar vídeo: {e}")
+        return None
+
+def safe_cleanup(temp_dir, max_attempts=3, delay=1):
+    """Limpa diretório temporário com segurança"""
+    for attempt in range(max_attempts):
+        try:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                logger.info(f"✅ Diretório temporário removido: {temp_dir}")
+                return True
+        except Exception as e:
+            logger.warning(f"⚠️ Tentativa {attempt + 1} falhou ao remover {temp_dir}: {e}")
+            if attempt < max_attempts - 1:
+                time.sleep(delay)
+    return False
 
 if __name__ == '__main__':
     main() 

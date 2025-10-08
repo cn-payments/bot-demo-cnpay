@@ -4,11 +4,12 @@
   "admin_user": "cnpaygateway",
   "pix_demo_qrcode": "00020101021226810014br.gov.bcb.pix2559qr.woovi.com/qr/v2/cob/2365b640-748a-4ba0-8e81-b3bb70abe4bd520400005303986540549.905802BR5911CN_PAY_LTDA6009Sao_Paulo6229052595bf9c63034f4a75b7985d62663046AE6",
   "messages": {
-    "welcome": "🚀 Bem-vindo ao futuro das vendas no Telegram!\n\n💎 Você está prestes a descobrir como transformar conversas em VENDAS AUTOMÁTICAS!\n\n✨ Esta é uma demonstração real do poder do CN BOT - imagine isso funcionando 24/7 para você!",
-    "payment_instructions": "💰 MOMENTO DA VERDADE!\n\n🎯 Clique no botão abaixo e veja como seus clientes terão uma experiência de pagamento PERFEITA!\n\n⚡ Em segundos você entenderá por que este sistema converte tanto!",
-    "payment_success": "🎉 PARABÉNS! Pagamento aprovado com sucesso!\n\n👑 Você agora é VIP (DEMONSTRAÇÃO) e pode ver exatamente como seus clientes se sentirão!\n\n🔥 Imagine essa sensação multiplicada por centenas de vendas automáticas!",
-    "payment_error": "⚠️ Ops! Erro na simulação do pagamento.\n\n🔄 Não se preocupe, isso é só demonstração! No sistema real, temos 99.9% de aprovação.\n\n💪 Tente novamente para ver a mágica acontecer!",
-    "broadcast_prefix": "🎯 [DEMO BROADCAST]"
+    "welcome": "🎯 Demonstração CN BOT em ação!\n\n💰 Veja como seus clientes terão uma experiência PREMIUM de compra!\n\n🚀 Este é o mesmo sistema que já processou milhares de vendas automáticas!",
+    "payment_instructions": "💎 Experiência de pagamento profissional!\n\n🔥 Clique no botão abaixo e sinta como seus clientes se sentirão ao comprar!\n\n⚡ Processo otimizado para máxima conversão!",
+    "payment_success": "🏆 SUCESSO! Pagamento aprovado instantaneamente!\n\n✅ Você agora é VIP (DEMO) - exatamente como seus clientes ficarão!\n\n💸 Imagine essa alegria se repetindo centenas de vezes no seu negócio!",
+    "payment_error": "🛠️ Simulação interrompida (normal no demo)!\n\n✅ No sistema real, nossa taxa de aprovação é superior a 95%!\n\n🎯 Tente novamente para completar a experiência!",
+    "broadcast_prefix": "📢 [DEMO EXCLUSIVO]",
+    "pix_automatico_instructions": "⚡ PIX TURBINADO ativado!\n\n💰 Pagamento instantâneo = Cliente satisfeito!\n\n🚀 Seus compradores vão AMAR a rapidez!"
   },
   "webhook": {
     "enabled": true,
@@ -40,14 +41,6 @@
       "invalid_phone": "❌ Telefone inválido para demonstração. Use formato: (11) 99999-9999\n\n(Qualquer número válido serve para o teste)",
       "success": "✅ Dados de teste salvos com sucesso!\n\n🚀 Agora vamos aos planos VIP - esta parte SIM estará no seu bot real!\n\n💎 Veja como seus leads verão as ofertas:"
     }
-  },
-  "messages": {
-    "welcome": "🎯 Demonstração CN BOT em ação!\n\n💰 Veja como seus clientes terão uma experiência PREMIUM de compra!\n\n🚀 Este é o mesmo sistema que já processou milhares de vendas automáticas!",
-    "payment_instructions": "💎 Experiência de pagamento profissional!\n\n🔥 Clique no botão abaixo e sinta como seus clientes se sentirão ao comprar!\n\n⚡ Processo otimizado para máxima conversão!",
-    "payment_success": "🏆 SUCESSO! Pagamento aprovado instantaneamente!\n\n✅ Você agora é VIP (DEMO) - exatamente como seus clientes ficarão!\n\n💸 Imagine essa alegria se repetindo centenas de vezes no seu negócio!",
-    "payment_error": "🛠️ Simulação interrompida (normal no demo)!\n\n✅ No sistema real, nossa taxa de aprovação é superior a 95%!\n\n🎯 Tente novamente para completar a experiência!",
-    "broadcast_prefix": "📢 [DEMO EXCLUSIVO]",
-    "pix_automatico_instructions": "⚡ PIX TURBINADO ativado!\n\n💰 Pagamento instantâneo = Cliente satisfeito!\n\n🚀 Seus compradores vão AMAR a rapidez!"
   },
   "payment_methods": {
     "pix_demo": {
@@ -106,6 +99,17 @@
       "start_date": "2025-06-25 15:37:23",
       "end_date": "2025-07-25 15:37:23",
       "is_permanent": false
+    },
+    {
+      "user_id": 6423539592,
+      "plan_id": 1,
+      "plan_name": "VIP MENSAL",
+      "start_date": "2025-10-08 02:59:54",
+      "end_date": "2025-11-07 02:59:54",
+      "is_permanent": false,
+      "invite_links": {
+        "-1002449868739": "https://t.me/c/1002449868739"
+      }
     }
   ],
   "database": {
@@ -116,9 +120,8 @@
     "database": "bot_demo"
   },
   "welcome_file": {
-    "file_id": "BAACAgEAAxkBAAIEV2hcU-RRv6FdMMXNOeXjHhqafzmuAAJEBQACJp_hRkUDL8HCCCe7NgQ",
-    "file_type": "video",
-    "caption": "🎬 Vídeo de apresentação do CN BOT!\n\n🚀 Descubra como transformar seu Telegram em uma máquina de vendas!\n\n💰 Assista e veja o potencial de faturamento que você tem em mãos!"
+    "file_id": "AgACAgEAAxkBAAIBHGjl75UxcOU3HyVJNpSvGZlGvAjVAAIeC2sb_5gxRx0ULnn0-V8_AQADAgADeAADNgQ",
+    "file_type": "photo",
+    "caption": "Bem-vindo ao CNBot DEMO! 🎉"
   }
 }
-
