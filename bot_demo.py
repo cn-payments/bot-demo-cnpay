@@ -2502,6 +2502,11 @@ async def finish_lead_capture(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler unificado para entrada de texto"""
+    # PRIORIDADE: Verificar se está em contexto de broadcast primeiro
+    if context.user_data.get('broadcast_type'):
+        await handle_admin_text(update, context)
+        return
+    
     # Verificar se está alterando dados pessoais
     if context.user_data.get('alterando_email', False):
         await handle_alterar_email(update, context)
