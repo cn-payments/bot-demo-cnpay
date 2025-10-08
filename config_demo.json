@@ -9,7 +9,8 @@
     "payment_success": "🏆 SUCESSO! Pagamento aprovado instantaneamente!\n\n✅ Você agora é VIP (DEMO) - exatamente como seus clientes ficarão!\n\n💸 Imagine essa alegria se repetindo centenas de vezes no seu negócio!",
     "payment_error": "🛠️ Simulação interrompida (normal no demo)!\n\n✅ No sistema real, nossa taxa de aprovação é superior a 95%!\n\n🎯 Tente novamente para completar a experiência!",
     "broadcast_prefix": "📢 [DEMO EXCLUSIVO]",
-    "pix_automatico_instructions": "⚡ PIX TURBINADO ativado!\n\n💰 Pagamento instantâneo = Cliente satisfeito!\n\n🚀 Seus compradores vão AMAR a rapidez!"
+    "pix_automatico_instructions": "⚡ PIX TURBINADO ativado!\n\n💰 Pagamento instantâneo = Cliente satisfeito!\n\n🚀 Seus compradores vão AMAR a rapidez!",
+    "planos_disponiveis": "Escolha um dos planos VIP disponíveis:"
   },
   "webhook": {
     "enabled": true,
@@ -34,6 +35,7 @@
     "require_phone": true,
     "skip_existing_users": true,
     "messages": {
+      "planos_disponiveis": "Escolha um dos planos VIP disponíveis:",
       "welcome": "👋 Olá! Bem-vindo ao BOT DEMO da CN PAY!\n\n🔍 Este é apenas um teste para você conhecer o sistema.\n\n⚠️ IMPORTANTE: No seu bot integrado, essas informações NÃO serão solicitadas aos seus leads!\n\nPara continuar a demonstração, preciso de algumas informações:",
       "email_request": "📧 Por favor, envie um e-mail para teste:\n\n💡 Lembre-se: isso é só para demonstração! No bot real, seus leads vão direto para os planos.",
       "phone_request": "📱 Agora envie um telefone para teste (com DDD):\n\n✨ No seu bot personalizado, essa etapa será removida e seus leads terão acesso imediato aos produtos!",
@@ -99,17 +101,6 @@
       "start_date": "2025-06-25 15:37:23",
       "end_date": "2025-07-25 15:37:23",
       "is_permanent": false
-    },
-    {
-      "user_id": 6423539592,
-      "plan_id": 1,
-      "plan_name": "VIP MENSAL",
-      "start_date": "2025-10-08 02:59:54",
-      "end_date": "2025-11-07 02:59:54",
-      "is_permanent": false,
-      "invite_links": {
-        "-1002449868739": "https://t.me/c/1002449868739"
-      }
     }
   ],
   "database": {
@@ -122,6 +113,6 @@
   "welcome_file": {
     "file_id": "AgACAgEAAxkBAAIBHGjl75UxcOU3HyVJNpSvGZlGvAjVAAIeC2sb_5gxRx0ULnn0-V8_AQADAgADeAADNgQ",
     "file_type": "photo",
-    "caption": "Bem-vindo ao CNBot DEMO! 🎉"
+    "caption": "🎯 Demonstração CN BOT em ação!\n\n💰 Veja como seus clientes terão uma experiência PREMIUM de compra!\n\n🚀 Este é o mesmo sistema que já processou milhares de vendas automáticas!"
   }
 }

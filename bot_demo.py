@@ -1751,14 +1751,14 @@ async def handle_admin_files(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 return
         
         # Processar vídeo (normal ou circular)
-        context.user_data['broadcast_video'] = {
-            'file_id': video_file_id,
-            'duration': video_duration,
-            'size': video_size,
-            'width': video_width,
-            'height': video_height,
-            'is_videonote': is_videonote
-        }
+            context.user_data['broadcast_video'] = {
+                'file_id': video_file_id,
+                'duration': video_duration,
+                'size': video_size,
+                'width': video_width,
+                'height': video_height,
+                'is_videonote': is_videonote
+            }
         
         logger.info(f"💾 Salvando informações do vídeo no contexto:")
         logger.info(f"📊 File ID: {video_file_id}")
